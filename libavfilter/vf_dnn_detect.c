@@ -210,6 +210,79 @@ static int dnn_detect_post_proc_tf(AVFrame *frame, DNNData *output, AVFilterCont
     return 0;
 }
 
+static int dnn_detect_post_proc_pd(AVFrame *frame, DNNData *output, AVFilterContext *filter_ctx)
+{
+    DnnDetectContext *ctx = filter_ctx->priv;
+    int proposal_count;
+    float conf_threshold = ctx->confidence;
+    float *box_info;
+    float x0, y0, x1, y1;
+    int nb_bboxes = 0;
+    AVFrameSideData *sd;
+    AVDetectionBBox *bbox;
+    AVDetectionBBoxHeader *header;
+
+    proposal_count = *(int *) (output[1].data);
+    box_info = output[0].data;
+
+    sd = av_frame_get_side_data(frame, AV_FRAME_DATA_DETECTION_BBOXES);
+    if (sd) {
+        av_log(filter_ctx, AV_LOG_ERROR, "already have dnn bounding boxes in side data.\n");
+        return -1;
+    }
+
+    for (int i = 0; i < proposal_count; ++i) {
+        if (box_info[i * 6 + 1] < conf_threshold)
+            continue;
+        nb_bboxes++;
+    }
+
+    if (nb_bboxes == 0) {
+        av_log(filter_ctx, AV_LOG_VERBOSE, "nothing detected in this frame.\n");
+        return 0;
+    }
+
+    header = av_detection_bbox_create_side_data(frame, nb_bboxes);
+    if (!header) {
+        av_log(filter_ctx, AV_LOG_ERROR, "failed to create side data with %d bounding boxes\n", nb_bboxes);
+        return -1;
+    }
+
+    av_strlcpy(header->source, ctx->dnnctx.model_filename, sizeof(header->source));
+
+    for (int i = 0; i < proposal_count; ++i) {
+        if (box_info[i * 6 + 1] < conf_threshold) {
+            continue;
+        }
+        x0 = box_info[i * 6 + 2];
+        y0 = box_info[i * 6 + 3];
+        x1 = box_info[i * 6 + 4];
+        y1 = box_info[i * 6 + 5];
+
+        bbox = av_get_detection_bbox(header, nb_bboxes - 1);
+
+        bbox->x = (int) (x0 );
+        bbox->w = (int) (x1 ) - bbox->x;
+        bbox->y = (int) (y0 );
+        bbox->h = (int) (y1 ) - bbox->y;
+
+        bbox->detect_confidence = av_make_q((int) (box_info[i * 6 + 1] * 10000), 10000);
+        bbox->classify_count = 0;
+
+        if (ctx->labels && box_info[i * 6] < ctx->label_count) {
+            av_strlcpy(bbox->detect_label, ctx->labels[(int) box_info[i * 6]], sizeof(bbox->detect_label));
+        } else {
+            snprintf(bbox->detect_label, sizeof(bbox->detect_label), "%d", (int) box_info[i * 6]);
+        }
+
+        nb_bboxes--;
+        if (nb_bboxes == 0) {
+            break;
+        }
+    }
+    return 0;
+}
+
 static int dnn_detect_post_proc(AVFrame *frame, DNNData *output, uint32_t nb, AVFilterContext *filter_ctx)
 {
     DnnDetectContext *ctx = filter_ctx->priv;
@@ -219,6 +292,8 @@ static int dnn_detect_post_proc(AVFrame *frame, DNNData *output, uint32_t nb, AV
         return dnn_detect_post_proc_ov(frame, output, filter_ctx);
     case DNN_TF:
         return dnn_detect_post_proc_tf(frame, output, filter_ctx);
+    case DNN_PD:
+        return dnn_detect_post_proc_pd(frame, output, filter_ctx);
     default:
         avpriv_report_missing_feature(filter_ctx, "Current dnn backend does not support detect filter\n");
         return AVERROR(EINVAL);
@@ -306,6 +381,13 @@ static int check_output_nb(DnnDetectContext *ctx, DNNBackendType backend_type, i
         if (output_nb != 1) {
             av_log(ctx, AV_LOG_ERROR, "Dnn detect filter with openvino backend needs 1 output only, \
                                        but get %d instead\n", output_nb);
+            return AVERROR(EINVAL);
+        }
+        return 0;
+    case DNN_PD:
+        if (output_nb != 2) {
+            av_log(ctx, AV_LOG_ERROR, "Dnn detect filter with paddle backend needs 2 output only, \
+                       but get %d instead\n", output_nb);
             return AVERROR(EINVAL);
         }
         return 0;

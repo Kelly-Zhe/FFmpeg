@@ -184,6 +184,14 @@ static enum AVPixelFormat get_pixel_format(DNNData *data)
             av_assert0(!"unsupported data pixel format.\n");
             return AV_PIX_FMT_BGR24;
         }
+    } else if (data->dt == DNN_FLOAT) {
+        switch (data->order) {
+            case DCO_RGB:
+                return AV_PIX_FMT_BGR24;
+            default:
+                av_assert0(!"unsupported data pixel format.\n");
+                return AV_PIX_FMT_BGR24;
+        }
     }
 
     av_assert0(!"unsupported data type.\n");

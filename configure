@@ -276,6 +276,8 @@ External library support:
   --enable-libsvtav1       enable AV1 encoding via SVT [no]
   --enable-libtensorflow   enable TensorFlow as a DNN module backend
                            for DNN based filters like sr [no]
+  --enable-libpaddle       enable Paddlepaddle as a DNN module backend
+                           for DNN based filters like sr [no]
   --enable-libtesseract    enable Tesseract, needed for ocr filter [no]
   --enable-libtheora       enable Theora encoding via libtheora [no]
   --enable-libtls          enable LibreSSL (via libtls), needed for https support
@@ -1855,6 +1857,7 @@ EXTERNAL_LIBRARY_LIST="
     libssh
     libsvtav1
     libtensorflow
+    libpaddle
     libtesseract
     libtheora
     libtwolame
@@ -2717,7 +2720,7 @@ dct_select="rdft"
 deflate_wrapper_deps="zlib"
 dirac_parse_select="golomb"
 dovi_rpu_select="golomb"
-dnn_suggest="libtensorflow libopenvino"
+dnn_suggest="libtensorflow libopenvino libpaddle"
 dnn_deps="avformat swscale"
 error_resilience_select="me_cmp"
 faandct_deps="faan"
@@ -6695,6 +6698,7 @@ enabled libspeex          && require_pkg_config libspeex speex speex/speex.h spe
 enabled libsrt            && require_pkg_config libsrt "srt >= 1.3.0" srt/srt.h srt_socket
 enabled libsvtav1         && require_pkg_config libsvtav1 "SvtAv1Enc >= 0.9.0" EbSvtAv1Enc.h svt_av1_enc_init_handle
 enabled libtensorflow     && require libtensorflow tensorflow/c/c_api.h TF_Version -ltensorflow
+enabled libpaddle         && require libpaddle pd_inference_api.h PD_GetVersion $CFLAGS
 enabled libtesseract      && require_pkg_config libtesseract tesseract tesseract/capi.h TessBaseAPICreate
 enabled libtheora         && require libtheora theora/theoraenc.h th_info_init -ltheoraenc -ltheoradec -logg
 enabled libtls            && require_pkg_config libtls libtls tls.h tls_configure

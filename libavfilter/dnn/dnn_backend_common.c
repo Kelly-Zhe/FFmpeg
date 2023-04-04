@@ -43,7 +43,7 @@ int ff_check_exec_params(void *ctx, DNNBackendType backend, DNNFunctionType func
         return AVERROR(EINVAL);
     }
 
-    if (exec_params->nb_output != 1 && backend != DNN_TF) {
+    if (exec_params->nb_output != 1 && backend != DNN_TF && backend !=DNN_PD) {
         // currently, the filter does not need multiple outputs,
         // so we just pending the support until we really need it.
         avpriv_report_missing_feature(ctx, "multiple outputs");
